@@ -32,7 +32,7 @@ st.title("E-Commerce Sales Dashboard")
 #
 @st.cache_data
 def load_data():
-    df = pd.read_csv("dashboard/main_data.csv")
+    df = pd.read_csv("main_data.csv")
     df['order_purchase_timestamp'] = pd.to_datetime(df['order_purchase_timestamp'])
     return df
 
@@ -136,16 +136,14 @@ if len(rfm_df) >= 5:
 
 #
 def segment_customer(score):
-    if score >= 13:
-        return "Top Customers"
-    elif score >= 10:
-        return "High Value"
-    elif score >= 7:
-        return "Medium Value"
-    elif score >= 5:
-        return "Low Value"
+    if score >= 10:
+        return "Champions"
+    elif score >= 8:
+        return "Loyal Customers"
+    elif score >= 6:
+        return "Potential Loyalist"
     else:
-        return "Lost"
+        return "At Risk"
 
 rfm_df['segment'] = rfm_df['RFM_score'].apply(segment_customer)
 
@@ -188,31 +186,69 @@ with col2:
         .groupby('customer_state')['total_order_value']
         .sum()
         .sort_values(ascending=False)
-        .head(10)
     )
 
-    st.subheader("Revenue by State")
+    state_df = state_revenue.reset_index()
+    state_df.columns = ["state", "revenue"]
 
-    fig, ax = plt.subplots(figsize=(10,7.2))
-
-    sns.barplot(
-        x=state_revenue.values,
-        y=state_revenue.index,
-        palette="viridis",
-        ax=ax
+    state_df["contribution_%"] = (
+        state_df["revenue"] / state_df["revenue"].sum() * 100
     )
 
-    ax.set_xlabel("Revenue", color="white")
-    ax.set_ylabel("State", color="white")
-    ax.tick_params(colors="white")
+    top_state = state_df.head(10)
 
-    ax.spines[['top','right','left','bottom']].set_visible(False)
 
+    st.subheader("Kontribusi Revenue per State (Top 10)")
+
+    fig, ax = plt.subplots(figsize=(10,7))
+
+    bars = ax.barh(top_state["state"], top_state["contribution_%"])
+
+    ax.grid(False)
+    ax.set_xlabel("Contribution (%)")
+
+    for bar in bars:
+        width = bar.get_width()
+        ax.text(width,
+                bar.get_y() + bar.get_height()/2,
+                f'{width:.2f}%',
+                va='center',
+                color='white')
+
+    ax.invert_yaxis()
     ax.set_facecolor("none")
     fig.patch.set_alpha(0)
 
     st.pyplot(fig)
 
+#
+st.subheader("Top 10 Customer berdasarkan Total Transaksi")
+
+top_customer = (
+    rfm_df.sort_values("monetary", ascending=False)
+    .head(10)
+)
+
+fig, ax = plt.subplots(figsize=(10,5))
+bars = ax.bar(top_customer["customer_id"], top_customer["monetary"])
+
+ax.grid(False)
+ax.set_xticklabels(top_customer["customer_id"], rotation=90)
+ax.set_ylabel("Total Transaksi")
+
+for bar in bars:
+    yval = bar.get_height()
+    ax.text(bar.get_x() + bar.get_width()/2,
+            yval,
+            f'{yval:,.0f}',
+            ha='center',
+            va='bottom',
+            color='white')
+
+ax.set_facecolor("none")
+fig.patch.set_alpha(0)
+
+st.pyplot(fig)
 
 #
 state_revenue_map = (
